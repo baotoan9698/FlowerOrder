@@ -75,7 +75,7 @@ export async function authenticate(_: { error: string }, form: FormData) {
 }
 export async function logout() {
   await deleteSession();
-  redirect("/");
+  redirect("/login");
 }
 export async function addCustomer(form: FormData) {
   const data = await shopData();

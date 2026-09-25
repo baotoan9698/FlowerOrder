@@ -1,7 +1,7 @@
 import { currentShop } from "@/lib/auth";
 import { shopData } from "@/lib/shop-data";
 import type { OrderView, CashView } from "@/lib/validation";
-import AuthForm from "./auth-form";
+import { redirect } from "next/navigation";
 import Dashboard from "./dashboard";
 export default async function ShopPage({
   initialView = "calendar",
@@ -9,7 +9,7 @@ export default async function ShopPage({
   initialView?: "calendar" | "reports" | "orders" | "products" | "cashflow" | "customers";
 }) {
   const shop = await currentShop();
-  if (!shop) return <AuthForm />;
+  if (!shop) redirect("/login");
   const data = await shopData();
   const [orders, products, cashEntries, customers] = await Promise.all([
     data.orders(),

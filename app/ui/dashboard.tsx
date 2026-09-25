@@ -225,7 +225,6 @@ export default function Dashboard({
         <button className="desktop-menu-toggle" type="button" aria-label={desktopExpanded ? "Thu gọn menu" : "Mở rộng menu"} aria-expanded={desktopExpanded} aria-controls="desktop-shop-navigation" onClick={toggleDesktopMenu} title={desktopExpanded ? "Thu gọn menu" : "Mở rộng menu"}>
           {desktopExpanded ? <ChevronLeft size={21} /> : <Menu size={21} />}<span>Thu gọn menu</span>
         </button>
-        <Link href="/" className="desktop-brand" aria-label="Elegant Order" title="Elegant Order"><Flower2 size={25} /><span>elegant order</span></Link>
         <nav id="desktop-shop-navigation">
           {[
             { label: "Tổng quan", path: "/", view: "calendar", icon: House },
@@ -246,12 +245,6 @@ export default function Dashboard({
         }
       }}>
         <button className="icon-button menu-close" aria-label="Đóng menu" onClick={closeMenu}><X size={21} /></button>
-        <a href="/" className="brand">
-          <span className="brand-icon">
-            <Flower2 />
-          </span>{" "}
-          elegant<span className="brand-light">order</span>
-        </a>
         <div className="shop-tag">
           <span className="avatar">{shop.name.charAt(0).toUpperCase()}</span>
           <div>

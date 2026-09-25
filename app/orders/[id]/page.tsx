@@ -1,14 +1,13 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { currentShop } from "@/lib/auth";
 import { shopData } from "@/lib/shop-data";
 import type { OrderView } from "@/lib/validation";
-import AuthForm from "../../ui/auth-form";
 import OrderDetail from "../../ui/order-detail";
 import type { OrderChange } from "@/lib/order-history";
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const shop = await currentShop();
-  if (!shop) return <AuthForm />;
+  if (!shop) redirect("/login");
   const { id } = await params;
   const data = await shopData();
   const order = await data.orderDetail(id);

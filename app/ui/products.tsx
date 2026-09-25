@@ -16,6 +16,8 @@ import type { ProductView } from "@/lib/validation";
 import MoneyInput from "./money-input";
 const money = (value: number) =>
   new Intl.NumberFormat("vi-VN").format(value) + " ₫";
+// Temporarily hide upload controls; existing product photos remain available.
+const imageUploadsVisible = false;
 export default function Products({ products }: { products: ProductView[] }) {
   const [editing, setEditing] = useState<ProductView | "new" | null>(null);
   const [price, setPrice] = useState("0");
@@ -246,7 +248,7 @@ export default function Products({ products }: { products: ProductView[] }) {
                     )}
                   </button>
                 </div>
-                {!product.archived && product.images.length < 3 && (
+                {imageUploadsVisible && !product.archived && product.images.length < 3 && (
                   <label className="upload-label">
                     <span className="upload-icon"><ImagePlus size={21} /></span>
                     <span className="upload-copy"><strong>{uploading
@@ -327,7 +329,7 @@ export default function Products({ products }: { products: ProductView[] }) {
                 defaultValue={editing === "new" ? "" : editing.description}
               />
             </label>
-            <div className="product-photo-picker">
+            {imageUploadsVisible && <div className="product-photo-picker">
               <label className="upload-label">
                 <span className="upload-icon"><ImagePlus size={21} /></span>
                 <span className="upload-copy"><strong>Chọn ảnh sản phẩm</strong><small>JPG, PNG, WebP · Tối đa 3 MB/ảnh</small></span>
@@ -347,7 +349,7 @@ export default function Products({ products }: { products: ProductView[] }) {
                 {previews[i] && <img src={previews[i]} alt={`Ảnh đã chọn ${i + 1}`} />}
                 <button type="button" className="secondary" disabled={pending} onClick={() => setFiles((current) => current.filter((_, index) => index !== i))}>Bỏ ảnh {i + 1}</button>
               </div>)}</div>
-            </div>
+            </div>}
             {error && (
               <p className="error" role="alert">
                 {error}
