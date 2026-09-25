@@ -1,0 +1,10 @@
+.env*
+!.env.example
+legacy/
+prisma/*.db*
+artifacts/
+tests/
+index.html
+Favicon.jpg
+.tmp/
+.private-storage/

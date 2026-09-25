@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  customers Customer[]
+  orderSequence Int @default(0)
+  customerSequence Int @default(0)
+  orders       Order[]
+  products     Product[]
+  cashEntries  CashEntry[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([shopId])
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  shopId         String
+  shop           Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product        String
+  productId      String?
+  catalogProduct Product? @relation(fields: [productId, shopId], references: [id, shopId], onDelete: NoAction, onUpdate: Cascade)
+  code String
+  customerId String
+  customerRecord Customer @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: NoAction, onUpdate: Cascade)
+  customer       String
+  phone          String
+  address        String
+  date           String
+  orderDate      String   @default("")
+  orderTime      String   @default("")
+  source         String   @default("")
+  items          OrderItem[]
+  history        OrderHistory[]
+  time           String
+  price          Int
+  paidAmount     Int      @default(0)
+  shippingFee    Int      @default(0)
+  discount       Int      @default(0)
+  payments       OrderPayment[]
+  status         String   @default("pending")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@unique([shopId, code])
+  @@unique([id, shopId])
+  @@index([shopId, customerId])
+  @@index([shopId, date])
+  @@index([shopId, orderDate])
+}
+
+model AuthAttempt {
+  key      String   @id
+  count    Int      @default(1)
+  resetsAt DateTime
+}
+
+model OrderHistory {
+  id String @id @default(cuid())
+  orderId String
+  shopId String
+  order Order @relation(fields: [orderId, shopId], references: [id, shopId], onDelete: Cascade)
+  actorId String
+  actorName String
+  actorEmail String
+  action String
+  changes String
+  createdAt DateTime @default(now())
+  @@index([orderId, shopId, createdAt])
+}
+
+model OrderItem {
+  id String @id @default(cuid())
+  orderId String
+  shopId String
+  order Order @relation(fields: [orderId, shopId], references: [id, shopId], onDelete: Cascade)
+  productId String?
+  product Product? @relation(fields: [productId, shopId], references: [id, shopId], onDelete: NoAction)
+  name String
+  quantity Int
+  unitPrice Int
+  position Int
+  @@index([orderId, shopId])
+  @@index([productId, shopId])
+}
+
+model OrderPayment {
+  id String @id @default(cuid())
+  orderId String
+  shopId String
+  order Order @relation(fields: [orderId, shopId], references: [id, shopId], onDelete: Cascade)
+  amount Int
+  method String
+  position Int
+  @@index([orderId, shopId])
+}
+
+model Product {
+  id          String         @id @default(cuid())
+  shopId      String
+  shop        Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  description String         @default("")
+  price       Int
+  archived    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  images      ProductImage[]
+  orders      Order[]
+  orderItems  OrderItem[]
+
+  @@unique([id, shopId])
+  @@index([shopId, archived])
+}
+
+model ProductImage {
+  id            String   @id @default(cuid())
+  shopId        String
+  productId     String
+  product       Product  @relation(fields: [productId, shopId], references: [id, shopId], onDelete: Cascade)
+  slot          Int
+  storageKey    String   @unique
+  storageDriver String
+  createdAt     DateTime @default(now())
+
+  @@unique([productId, shopId, slot])
+  @@index([shopId])
+}
+
+model CashEntry {
+  id String @id @default(cuid())
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  type String
+  date String
+  title String
+  category String
+  amount Int
+  note String @default("")
+  createdAt DateTime @default(now())
+
+  @@index([shopId, date])
+}
+
+model Customer {
+  id String @id @default(cuid())
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  code String
+  name String
+  phone String
+  address String
+  identityKey String
+  email String @default("")
+  birthday String @default("")
+  gender String @default("")
+  createdAt DateTime @default(now())
+  orders Order[]
+
+  @@unique([id, shopId])
+  @@unique([shopId, code])
+  @@unique([shopId, identityKey])
+}

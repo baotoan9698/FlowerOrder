@@ -1,0 +1,157 @@
+import { navigate } from "./navigation.mjs";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { chromium, expect } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import sharp from "sharp";
+import { existsSync, mkdirSync } from "node:fs";
+import { unlink } from "node:fs/promises";
+import { resolve, sep } from "node:path";
+
+test("Product dialog photos retry without duplication; cash ledger CRUD, totals and tenant isolation", { timeout: 180000 }, async () => {
+  const db = new PrismaClient();
+  const executablePath = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
+  const browser = await chromium.launch({ headless: true, executablePath });
+  const contexts = await Promise.all([browser.newContext({ viewport: { width: 1440, height: 1000 } }), browser.newContext()]);
+  const pages = await Promise.all(contexts.map((context) => context.newPage()));
+  const [a, b] = pages;
+  const base = "http://127.0.0.1:3000";
+  const emails = [0, 1].map((i) => `cash-test-${Date.now()}-${i}@example.com`);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  async function save(page, title, type, value, date = today) {
+    await page.getByRole("button", { name: "Thêm thu chi", exact: true }).click();
+    await page.getByLabel("Loại phiếu").selectOption(type);
+    await page.getByLabel("Ngày giao dịch").fill(date);
+    await page.getByLabel("Nội dung", { exact: true }).fill(title);
+    await page.getByLabel("Danh mục", { exact: true }).fill("Khác");
+    await page.getByLabel("Số tiền (₫)", { exact: true }).fill(String(value));
+    await page.getByRole("button", { name: "Lưu phiếu", exact: true }).click();
+    await page.locator("dialog:not(#shop-menu)").waitFor({ state: "hidden" });
+  }
+  try {
+    for (let i = 0; i < 2; i++) {
+      const page = pages[i];
+      await page.goto(base);
+      await page.getByRole("button", { name: "Tạo shop mới", exact: true }).click();
+      await page.getByLabel("Tên shop").fill(`Cash test ${i}`);
+      await page.getByLabel("Email", { exact: true }).fill(emails[i]);
+      await page.getByLabel("Mật khẩu").fill("TestingCash123!");
+      await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await page.getByRole("heading", { name: "Tổng quan" }).waitFor();
+    }
+    const shops = await Promise.all(emails.map((email) => db.shop.findUniqueOrThrow({ where: { email } })));
+    await navigate(a, "Sản phẩm");
+    await a.getByRole("button", { name: "Thêm sản phẩm", exact: true }).click();
+    await a.getByLabel("Tên sản phẩm", { exact: true }).fill("Hoa có ảnh trong form");
+    await a.getByLabel("Giá sản phẩm (₫)", { exact: true }).fill("500000");
+    const png = await sharp({ create: { width: 80, height: 80, channels: 3, background: "#d9899e" } }).png().toBuffer();
+    await a.getByLabel("Chọn ảnh sản phẩm").setInputFiles([{ name: "hoa.png", mimeType: "image/png", buffer: png }]);
+    await a.getByAltText("Ảnh đã chọn 1").waitFor();
+    await a.setViewportSize({ width: 390, height: 844 });
+    mkdirSync("artifacts", { recursive: true });
+    await a.screenshot({ path: "artifacts/product-form-mobile.png", fullPage: true });
+    await a.route("**/api/products/*/images", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Thử lỗi tải ảnh" }) }));
+    await a.getByRole("button", { name: "Lưu sản phẩm", exact: true }).click();
+    await a.getByRole("alert").filter({ hasText: "Sản phẩm đã lưu" }).waitFor();
+    assert.equal(await db.product.count({ where: { shopId: shops[0].id } }), 1);
+    await a.unroute("**/api/products/*/images");
+    await a.getByRole("button", { name: "Lưu sản phẩm", exact: true }).click();
+    await a.locator("dialog:not(#shop-menu)").waitFor({ state: "hidden" });
+    assert.equal(await db.product.count({ where: { shopId: shops[0].id } }), 1);
+    assert.equal(await db.productImage.count({ where: { shopId: shops[0].id } }), 1);
+    await navigate(a, "Thu chi");
+    await save(a, "Thu khách A", "income", 1000000);
+    await save(a, "Nhập hoa A", "expense", 250000);
+    await save(a, "Phiếu cũ", "income", 800000, "2020-01-01");
+    const metrics = a.locator(".cash-stats");
+    await expect(metrics.locator("article").nth(0)).toContainText("0 ₫");
+    assert.match(await metrics.innerText(), /250\.000/);
+    assert.match(await metrics.innerText(), /-250\.000/);
+    assert.equal(await a.getByRole("heading", { name: "Phiếu cũ", exact: true }).count(), 0);
+    await a.getByRole("button", { name: "Sửa Nhập hoa A", exact: true }).click();
+    await a.getByLabel("Số tiền (₫)", { exact: true }).fill("300000");
+    assert.equal(await a.getByLabel("Số tiền (₫)", { exact: true }).inputValue(), "300.000");
+    await a.getByRole("button", { name: "Lưu phiếu", exact: true }).click();
+    await a.locator("dialog:not(#shop-menu)").waitFor({ state: "hidden" });
+    await expect(metrics).toContainText("-300.000");
+    assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await a.screenshot({ path: "artifacts/cashflow-mobile.png", fullPage: true });
+    await a.setViewportSize({ width: 1440, height: 1000 });
+    await a.screenshot({ path: "artifacts/cashflow-desktop.png", fullPage: true });
+    await b.goto(base + "/cashflow");
+    assert.equal(await b.getByRole("heading", { name: "Thu khách A", exact: true }).count(), 0);
+    await save(b, "Phiếu B", "income", 123000);
+    const cashA = await db.cashEntry.findFirstOrThrow({ where: { shopId: shops[0].id, title: "Thu khách A" } });
+    const cashB = await db.cashEntry.findFirstOrThrow({ where: { shopId: shops[1].id } });
+    await b.getByRole("button", { name: "Sửa Phiếu B", exact: true }).click();
+    await b.locator('dialog:not(#shop-menu) input[name="id"]').evaluate((input, id) => { input.value = id; }, cashA.id);
+    await b.getByLabel("Nội dung", { exact: true }).fill("Attempt cross shop");
+    await b.getByRole("button", { name: "Lưu phiếu", exact: true }).click();
+    await b.getByRole("alert").filter({ hasText: "Không tìm thấy" }).waitFor();
+    assert.equal((await db.cashEntry.findUniqueOrThrow({ where: { id: cashA.id } })).title, "Thu khách A");
+    await b.getByRole("button", { name: "Hủy", exact: true }).click();
+    let replaced = false;
+    await b.route(base + "/cashflow", async (route) => {
+      const body = route.request().postData();
+      if (route.request().method() === "POST" && body?.includes(cashB.id)) { replaced = true; await route.continue({ postData: body.replaceAll(cashB.id, cashA.id) }); }
+      else await route.continue();
+    });
+    b.on("dialog", (dialog) => dialog.accept());
+    await b.getByRole("button", { name: "Xóa Phiếu B", exact: true }).click();
+    await b.getByRole("alert").filter({ hasText: "Không tìm thấy" }).waitFor();
+    assert.equal(replaced, true);
+    assert.ok(await db.cashEntry.findUnique({ where: { id: cashA.id } }));
+    await b.unroute(base + "/cashflow");
+    await b.getByRole("button", { name: "Xóa Phiếu B", exact: true }).click();
+    await b.getByRole("status").filter({ hasText: "Đã xóa" }).waitFor();
+    assert.equal(await db.cashEntry.findUnique({ where: { id: cashB.id } }), null);
+    // Financial reporting uses placement dates and expense entries, never cash income.
+    await a.goto(base);
+    await a.getByRole("button", { name: "Tạo đơn hàng", exact: true }).click();
+    await a.getByRole("combobox", { name: "Khách hàng", exact: true }).fill("Khách báo cáo");
+    await a.getByLabel("Số điện thoại", { exact: true }).fill("0901234567");
+    await a.getByLabel("Địa chỉ").fill("Địa chỉ thử báo cáo");
+    await a.getByRole("combobox", { name: "Sản phẩm", exact: true }).fill("Hoa báo cáo tài chính");
+    await a.getByLabel("Đơn giá (₫)", { exact: true }).fill("850000");
+    await a.getByRole("button", { name: "Lưu đơn hàng", exact: true }).click();
+    await a.locator("dialog:not(#shop-menu)").waitFor({ state: "detached" });
+    await db.order.updateMany({ where: { shopId: cashA.shopId, product: "Hoa báo cáo tài chính" }, data: { orderDate: "2020-01-01" } });
+    await navigate(a, "Thu chi");
+    await expect(a.locator(".cash-stats article").nth(0)).toContainText("0 ₫");
+    await a.getByRole("button", { name: "Tất cả thời gian", exact: true }).click();
+    await expect(a.locator(".cash-stats article").nth(0)).toContainText("850.000 ₫");
+    await expect(a.locator(".cash-stats article").nth(2)).toContainText("550.000 ₫");
+    await navigate(a, "Báo cáo");
+    await a.getByRole("button", { name: "Tài chính", exact: true }).click();
+    const financial = a.getByRole("region", { name: "Tổng hợp tài chính" });
+    await expect(financial.locator("article").nth(0)).toContainText("0 ₫");
+    await expect(financial.locator("article").nth(1)).toContainText("300.000 ₫");
+    await expect(financial.locator("article").nth(2)).toContainText("-300.000 ₫");
+    await expect(a.locator(".financial-report tbody tr")).toHaveCount(1);
+    await a.getByLabel("Từ ngày", { exact: true }).fill("2020-01-01");
+    await expect(financial.locator("article").nth(0)).toContainText("850.000 ₫");
+    await expect(financial.locator("article").nth(2)).toContainText("550.000 ₫");
+    await expect(a.locator(".financial-report tbody tr")).toHaveCount(2);
+    await a.screenshot({ path: "artifacts/financial-desktop.png", fullPage: true });
+    await a.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await a.screenshot({ path: "artifacts/financial-mobile.png", fullPage: true });
+    await a.getByLabel("Đến ngày", { exact: true }).fill("2020-01-01");
+    await expect(financial.locator("article").nth(1)).toContainText("0 ₫");
+    await expect(financial.locator("article").nth(2)).toContainText("850.000 ₫");
+    await b.goto(base + "/reports");
+    await b.getByRole("button", { name: "Tài chính", exact: true }).click();
+    await expect(b.locator(".financial-report .stat strong")).toHaveText(["0 ₫", "0 ₫", "0 ₫"]);
+  } catch (error) {
+    console.log("Page URL", a.url(), "Body", (await a.locator("body").innerText()).slice(0, 2200));
+    throw error;
+  } finally {
+    const shops = await db.shop.findMany({ where: { email: { in: emails } }, select: { id: true } });
+    const images = await db.productImage.findMany({ where: { shopId: { in: shops.map((s) => s.id) } } });
+    const root = resolve(".private-storage");
+    for (const image of images) { const path = resolve(root, image.storageKey); if (image.storageDriver === "local" && path.startsWith(root + sep)) await unlink(path).catch(() => {}); }
+    await db.shop.deleteMany({ where: { email: { in: emails } } });
+    await db.authAttempt.deleteMany({ where: { key: { in: emails } } });
+    await browser.close(); await db.$disconnect();
+  }
+});

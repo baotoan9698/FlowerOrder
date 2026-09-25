@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env*
+!.env.example
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+artifacts/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.vercel/
+.tmp/
+.private-storage/
