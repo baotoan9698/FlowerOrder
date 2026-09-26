@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
@@ -20,6 +21,7 @@ test("Calendar fits 20 flowers on desktop and mobile, caps markers but retains a
     await page.getByLabel("Email", { exact: true }).fill(email);
     await page.getByLabel("Mật khẩu").fill("CalendarFlowers123!");
     await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
     await page.getByRole("button", { name: "Tạo đơn hàng", exact: true }).waitFor();
     const shop = await db.shop.findUniqueOrThrow({ where: { email } });
     const customer = await db.customer.create({ data: { shopId: shop.id, code: "KH000001", name: "Khách thử", phone: "0000000000", address: "Địa chỉ thử", identityKey: "calendar-test" } });

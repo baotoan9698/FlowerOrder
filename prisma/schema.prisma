@@ -9,6 +9,9 @@ datasource db {
 }
 
 model Shop {
+  accessStatus String @default("pending")
+  accessUntil DateTime?
+  adminEvents AdminEvent[]
   id           String    @id @default(cuid())
   name         String
   email        String    @unique
@@ -178,4 +181,30 @@ model Customer {
   @@unique([id, shopId])
   @@unique([shopId, code])
   @@unique([shopId, identityKey])
+}
+
+model Admin {
+  id String @id @default(cuid())
+  email String @unique
+  name String
+  passwordHash String
+  sessions AdminSession[]
+  events AdminEvent[]
+}
+model AdminSession {
+  id String @id
+  adminId String
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([adminId])
+}
+model AdminEvent {
+  id String @id @default(cuid())
+  adminId String
+  admin Admin @relation(fields: [adminId], references: [id])
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  details String
+  createdAt DateTime @default(now())
+  @@index([shopId, createdAt])
 }

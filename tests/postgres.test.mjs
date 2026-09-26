@@ -196,6 +196,8 @@ test("PostgreSQL migration: unique accounts, order defaults, foreign keys and ca
     await db.query('UPDATE "Order" SET "paidAmount" = 100 WHERE id = $1', ["order-a"]);
     await db.exec(readFileSync(new URL("../prisma/migrations/20260925020000_order_payments/migration.sql", import.meta.url), "utf8"));
     await db.exec(readFileSync(new URL("../prisma/migrations/20260925030000_order_discount/migration.sql", import.meta.url), "utf8"));
+    await db.exec(readFileSync(new URL("../prisma/migrations/20260925040000_admin_access/migration.sql", import.meta.url), "utf8"));
+    assert.equal((await db.query('SELECT "accessStatus" FROM "Shop" WHERE id = $1', ['a'])).rows[0].accessStatus, 'active');
     assert.equal((await db.query('SELECT discount FROM "Order" LIMIT 1')).rows[0].discount, 0);
     await assert.rejects(db.exec('UPDATE "Order" SET discount = -1'), /check/i);
     const oldPayment = (await db.query('SELECT amount, method FROM "OrderPayment" WHERE "orderId" = $1', ["order-a"])).rows[0];

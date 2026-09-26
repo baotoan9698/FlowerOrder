@@ -1,4 +1,14 @@
-# Elegant Order · Next.js trên Vercel
+# Floralhelp · Next.js trên Vercel
+
+### Quản trị và thời hạn sử dụng
+
+- `/admin/login`: đăng nhập quản trị bằng tài khoản riêng trong bảng `Admin`. Không có đăng ký admin công khai.
+- `/admin`: tìm shop, duyệt/từ chối, tạm khóa, đặt/gia hạn đến hết ngày theo giờ Việt Nam và xem lịch sử quản trị.
+- Tài khoản shop mới ở trạng thái `pending`, chưa được đăng nhập bán hàng. Shop cũ giữ trạng thái `active` chưa đặt hạn để tránh gián đoạn; admin cần đặt hạn cho từng shop.
+- Hết hạn được kiểm tra tại server trên mỗi lần truy cập dữ liệu. Phiên bị thu hồi; trình duyệt kiểm tra mỗi 15 giây và đặt hẹn giờ theo ngày hết hạn để chuyển về `/login`. Không xóa dữ liệu bán hàng. Thay đổi quyền/hạn từ admin thu hồi các phiên đang đăng nhập và yêu cầu đăng nhập lại.
+- Tạo admin bằng `node scripts/create-admin.mjs admin@example.com` với `DATABASE_URL` trỏ đúng database và Prisma client tương ứng. Lệnh sinh mật khẩu ngẫu nhiên, không ghi mật khẩu vào source và không ghi đè tài khoản đã tồn tại.
+- Khi triển khai subdomain, đặt `ADMIN_HOST=admin.tenmien.vn` (không có giao thức). Host admin chuyển `/` về `/admin`, `/login` về `/admin/login`; host khác không phục vụ `/admin`. Cookie admin và shop riêng, không đặt Domain dùng chung. Localhost không đặt `ADMIN_HOST`.
+- Chạy kiểm tra: `node --test tests/admin.test.mjs` với local SQLite. Luồng test tạo và dọn tài khoản thử riêng.
 
 Ứng dụng quản lý đơn hoa: mỗi tài khoản là một shop độc lập, có đăng nhập, lịch giao hàng, tìm kiếm, lọc trạng thái, thêm/sửa/xóa đơn và giao diện PC/mobile.
 

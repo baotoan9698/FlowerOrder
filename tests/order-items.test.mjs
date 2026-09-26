@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
@@ -21,6 +22,7 @@ test("Multiple order items: suggestions, direct entry, totals, edit, isolation a
     await page.getByLabel("Email", { exact: true }).fill(email);
     await page.getByLabel("Mật khẩu").fill("ItemsTest123!");
     await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
     await page.getByRole("button", { name: "Tạo đơn hàng", exact: true }).waitFor();
     const shop = await db.shop.findUniqueOrThrow({ where: { email } });
     const product = await db.product.create({ data: { shopId: shop.id, name: "Hoa ly hồng pastel", price: 395000 } });

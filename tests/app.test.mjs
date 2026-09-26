@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { navigate } from "./navigation.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -42,6 +43,7 @@ test(
       await page.getByLabel("Email", { exact: true }).fill(email);
       await page.getByLabel("Mật khẩu").fill("FlowerTest123!");
       await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
       await page
         .getByRole("button", { name: "Tạo đơn hàng", exact: true })
         .waitFor();
@@ -291,7 +293,7 @@ test(
         null,
       );
       const cookies = await contextA.cookies();
-      assert.ok(cookies.find((c) => c.name === "elegant_session")?.httpOnly);
+      assert.ok(cookies.find((c) => c.name === "floralhelp_session")?.httpOnly);
       await navigate(a, "Đăng xuất");
       await a.getByRole("heading", { name: "Chào mừng trở lại" }).waitFor();
       await a.getByLabel("Email", { exact: true }).fill(emails[0]);

@@ -318,6 +318,25 @@ footer { color:#977286; font-size:11px; }
 .product-suggestions p { font-size: 11px; padding: 10px; margin: 0; background: #fff0f6; }
 .order-item-search .quick-add-product { padding: 5px 8px; margin-top: 5px; font-size: 11px; min-height: 28px; box-shadow: none; }
 .quick-add-slot { height: 34px; }
+.admin-page { max-width:1280px; margin:0 auto; padding:28px 20px; }
+.admin-page header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
+.admin-search { display:flex; gap:10px; max-width:600px; }
+.admin-shop-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:20px; }
+.admin-shop { padding:22px; min-width:0; overflow-wrap:anywhere; }
+.admin-shop h2 { margin:0 0 8px; }
+.admin-delete-shop { margin-top:18px; padding-top:14px; border-top:1px dashed var(--line); }
+.admin-shop-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.admin-shop-heading > div { min-width:0; flex:1; }
+.admin-shop-heading p { margin:0; }
+.admin-status { flex:0 0 auto; white-space:nowrap; padding:6px 10px; border-radius:10px; }
+.admin-status-active { background:#d8f4df; color:#176737; border:1px solid #9bd6ac; }
+.floralhelp-logo { width:208px; height:auto; max-width:100%; }
+.admin-access-form { display:grid; gap:12px; margin:20px 0; }
+.admin-access-form label, .admin-login label { display:grid; gap:6px; }
+.admin-login { max-width:440px; margin:8vh auto; padding:28px; }
+.admin-login form { display:grid; gap:18px; }
+.admin-shop details { border-top:1px dashed var(--line); padding-top:14px; }
+@media(max-width:600px) { .admin-page header { align-items:start; flex-direction:column; } .admin-login { margin:24px 12px; } }
 .product-suggestions button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px 10px; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: white; box-shadow: none; }
 .product-suggestions button[aria-selected="true"], .product-suggestions button:hover { background: #fff0f6; }
 .product-suggestions button span { flex: 1; min-width: 0; overflow-wrap: anywhere; }

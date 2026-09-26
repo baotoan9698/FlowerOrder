@@ -8,7 +8,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { authenticate } from "../actions";
-export default function AuthForm() {
+export default function AuthForm({ notice }: { notice?: string }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -17,10 +17,7 @@ export default function AuthForm() {
     <main className="auth-page">
       <section className="auth-story">
         <a className="brand" href="/">
-          <span className="brand-icon">
-            <Flower2 />
-          </span>{" "}
-          elegant<span className="brand-light">order</span>
+          <img className="floralhelp-logo" src="/floralhelp-logo.svg" alt="Floralhelp" width={520} height={128} />
         </a>
         <div className="story-content">
           <span className="eyebrow">MỖI ĐƠN HOA, MỘT NIỀM VUI</span>
@@ -48,7 +45,7 @@ export default function AuthForm() {
             <Smartphone /> Thuận tiện trên máy tính và điện thoại
           </div>
         </div>
-        <small>ELEGANT ORDER · MADE FOR FLOWER SHOPS</small>
+        <small>FLORALHELP · MADE FOR FLOWER SHOPS</small>
       </section>
       <section className="auth-panel">
         <div className="auth-box">
@@ -121,6 +118,7 @@ export default function AuthForm() {
                 }
               />
             </label>
+            {notice && !state.error && <p className="error" role="alert">{notice}</p>}
             {state.error && (
               <p className="error" role="alert">
                 {state.error}

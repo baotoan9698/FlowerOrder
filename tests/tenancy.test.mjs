@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { navigate } from "./navigation.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -60,6 +61,7 @@ test(
       await page.getByLabel("Email", { exact: true }).fill(emails[index]);
       await page.getByLabel("Mật khẩu").fill(password);
       await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
       await page
         .getByRole("button", { name: "Tạo đơn hàng", exact: true })
         .waitFor();
@@ -339,7 +341,7 @@ test(
         "B renamed",
       );
       const token = (await contexts[0].cookies()).find(
-        (c) => c.name === "elegant_session",
+        (c) => c.name === "floralhelp_session",
       ).value;
       await navigate(a, "Đăng xuất");
       await a.getByLabel("Email", { exact: true }).waitFor();
@@ -347,7 +349,7 @@ test(
       assert.equal(
         (
           await contexts[2].request.get(imageUrl, {
-            headers: { cookie: `elegant_session=${token}` },
+            headers: { cookie: `floralhelp_session=${token}` },
           })
         ).status(),
         401,

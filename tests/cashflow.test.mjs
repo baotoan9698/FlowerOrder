@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { navigate } from "./navigation.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -37,6 +38,7 @@ test("Product dialog photos retry without duplication; cash ledger CRUD, totals 
       await page.getByLabel("Email", { exact: true }).fill(emails[i]);
       await page.getByLabel("Mật khẩu").fill("TestingCash123!");
       await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
       await page.getByRole("heading", { name: "Tổng quan" }).waitFor();
     }
     const shops = await Promise.all(emails.map((email) => db.shop.findUniqueOrThrow({ where: { email } })));

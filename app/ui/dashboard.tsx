@@ -93,7 +93,7 @@ export default function Dashboard({
   customers,
   initialView = "calendar",
 }: {
-  shop: { name: string; email: string };
+  shop: { name: string; email: string; accessUntil: string | null };
   orders: OrderView[];
   products: ProductView[];
   cashEntries: CashView[];
@@ -327,9 +327,9 @@ export default function Dashboard({
                   <span className="eyebrow">MỘT NGÀY THẬT ĐẸP ĐỂ TRAO HOA</span>
                   <h1>
                     {view === "calendar"
-                      ? "Tổng quan"
+                      ? `Xin chào, ${shop.name}`
                       : "Danh sách đơn hàng"}
-                    <span className="heading-flower">✳</span>
+                    {view !== "calendar" && <span className="heading-flower">✳</span>}
                   </h1>
                   <p>Sắp xếp gọn gàng, chăm chút từng đơn hoa.</p>
                 </div>
@@ -667,8 +667,7 @@ export default function Dashboard({
             </>
           )}
           <footer>
-            Được chăm chút cho những người yêu hoa <Flower2 size={13} /> Elegant
-            Order
+            Được chăm chút cho những người yêu hoa <Flower2 size={13} /> Floralhelp
           </footer>
         </main>
       </div>
@@ -757,6 +756,10 @@ export default function Dashboard({
             <label>
               Email đăng nhập
               <input value={shop.email} readOnly />
+            </label>
+            <label>
+              Thời hạn sử dụng tài khoản
+              <input readOnly value={shop.accessUntil ?? "Chưa đặt thời hạn sử dụng"} />
             </label>
             {error && (
               <p className="error" role="alert">

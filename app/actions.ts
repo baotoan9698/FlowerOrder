@@ -14,6 +14,7 @@ import { orderSchema, orderItemSchema, orderPaymentSchema, productSchema, cashSc
 import { shopData } from "@/lib/shop-data";
 import { vietnamToday, vietnamTime } from "@/lib/dates";
 import type { OrderChange } from "@/lib/order-history";
+import { accessReason, accessMessages } from "@/lib/access";
 
 export async function getOrderHistory(orderId: string) {
   const data = await shopData();
@@ -70,6 +71,11 @@ export async function authenticate(_: { error: string }, form: FormData) {
     return { error: "Chưa thể kết nối. Vui lòng thử lại." };
   }
   await db.authAttempt.deleteMany({ where: { key } });
+  const reason = accessReason(shop);
+  if (reason) {
+    await db.session.deleteMany({ where: { shopId: shop.id } });
+    return { error: accessMessages[reason] ?? "Shop chưa được cấp quyền sử dụng." };
+  }
   await createSession(shop.id);
   redirect("/");
 }

@@ -1,3 +1,4 @@
+import { approveFixture } from "./approve-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
@@ -17,6 +18,7 @@ test("Left drawer opens, closes, restores focus and navigates on desktop and mob
     await page.getByLabel("Email", { exact: true }).fill(email);
     await page.getByLabel("Mật khẩu").fill("MenuTest12345!");
     await page.getByRole("button", { name: "Tạo shop", exact: true }).click();
+      await approveFixture(page, db);
     const toggle = page.getByRole("button", { name: "Mở menu", exact: true });
     const drawer = page.getByRole("dialog", { name: "Menu quản lý shop", exact: true });
     const desktop = page.getByRole("complementary", { name: "Menu PC", exact: true });
