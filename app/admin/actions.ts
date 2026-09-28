@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { deleteStoredImage } from "@/lib/image-storage";
-import { verifyPassword } from "@/lib/auth";
+import { verifyPassword, hashPassword } from "@/lib/auth";
+import { randomBytes } from "node:crypto";
 import { adminHostAllowed, createAdminSession, deleteAdminSession, requireAdmin } from "@/lib/admin-auth";
 export async function adminLogin(_: { error: string }, form: FormData) {
   if (!(await adminHostAllowed())) return { error: "Vui lòng sử dụng địa chỉ quản trị." };
@@ -22,6 +23,23 @@ export async function adminLogin(_: { error: string }, form: FormData) {
   redirect("/admin");
 }
 export async function adminLogout() { await deleteAdminSession(); redirect("/admin/login"); }
+export async function resetShopPassword(id: string) {
+  const admin = await requireAdmin();
+  if (typeof id !== "string" || !id || id.length > 128) return { error: "Shop không hợp lệ." };
+  const password = `Fh!9${randomBytes(24).toString("base64url")}`;
+  const changed = await db.$transaction(async (tx) => {
+    const shop = await tx.shop.findUnique({ where: { id } });
+    if (!shop) return false;
+    await tx.shop.update({ where: { id }, data: { passwordHash: hashPassword(password) } });
+    await tx.session.deleteMany({ where: { shopId: id } });
+    await tx.authAttempt.deleteMany({ where: { key: { in: [shop.email, `change-password:${id}`] } } });
+    await tx.adminEvent.create({ data: { adminId: admin.id, shopId: id, details: JSON.stringify({ type: "password-reset" }) } });
+    return true;
+  });
+  if (!changed) return { error: "Không tìm thấy shop." };
+  revalidatePath("/admin");
+  return { error: "", password };
+}
 export async function deleteShopAccount(form: FormData) {
   await requireAdmin();
   const id = String(form.get("id") ?? "");

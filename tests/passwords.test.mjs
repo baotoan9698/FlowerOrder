@@ -1,0 +1,111 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { chromium, expect } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { randomBytes, scryptSync, createHash } from "node:crypto";
+import { existsSync, mkdirSync } from "node:fs";
+
+test("Shop password change and admin reset revoke sessions and isolate shops", { timeout: 120000 }, async () => {
+  const db = new PrismaClient();
+  const browser = await chromium.launch({ headless: true, executablePath: ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync) });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  const base = "http://127.0.0.1:3000";
+  const suffix = randomBytes(6).toString("hex");
+  const password = randomBytes(18).toString("hex");
+  const nextPassword = randomBytes(18).toString("hex");
+  const hash = (value) => { const salt = randomBytes(16).toString("hex"); return `${salt}:${scryptSync(value, salt, 64).toString("hex")}`; };
+  let shop, other, admin;
+  async function login(value) {
+    await page.goto(`${base}/login`);
+    await page.getByLabel("Email", { exact: true }).fill(shop.email);
+    await page.getByLabel("Mật khẩu", { exact: true }).fill(value);
+    await page.getByRole("button", { name: "Vào shop của bạn" }).click();
+  }
+  try {
+    shop = await db.shop.create({ data: { name: "Password test", email: `password-${suffix}@example.com`, passwordHash: hash(password), accessStatus: "active" } });
+    other = await db.shop.create({ data: { name: "Other shop", email: `other-${suffix}@example.com`, passwordHash: hash(password), accessStatus: "active" } });
+    admin = await db.admin.create({ data: { name: "Password admin", email: `admin-password-${suffix}@example.com`, passwordHash: hash(password) } });
+    await login(password);
+    await expect(page).toHaveURL(`${base}/`);
+    await page.getByRole("button", { name: "Cài đặt shop", exact: true }).first().click();
+    let panel = page.locator(".password-panel");
+    await expect(panel.getByLabel("Mật khẩu hiện tại", { exact: true })).toHaveCount(0);
+    await panel.getByRole("button", { name: "Đổi mật khẩu", exact: true }).click();
+    await page.getByRole("dialog", { name: "Đổi mật khẩu", exact: true }).getByRole("button", { name: "Hủy", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Cài đặt shop", exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Đổi mật khẩu", exact: true }).click();
+    panel = page.getByRole("dialog", { name: "Đổi mật khẩu", exact: true });
+    await panel.getByLabel("Mật khẩu hiện tại", { exact: true }).fill("wrong-password");
+    await panel.getByLabel("Mật khẩu mới", { exact: true }).fill(nextPassword);
+    await panel.getByLabel("Nhập lại mật khẩu mới").fill(nextPassword);
+    await panel.getByRole("button", { name: "Đổi mật khẩu", exact: true }).click();
+    await expect(panel.getByRole("alert")).toHaveText("Mật khẩu hiện tại không đúng.");
+    assert.equal((await db.shop.findUniqueOrThrow({ where: { id: shop.id } })).passwordHash, shop.passwordHash);
+    await panel.getByLabel("Mật khẩu hiện tại", { exact: true }).fill(password);
+    await panel.getByLabel("Nhập lại mật khẩu mới").fill("does-not-match");
+    await panel.getByRole("button", { name: "Đổi mật khẩu", exact: true }).click();
+    await expect(panel.getByRole("alert")).toHaveText("Nhập lại mật khẩu mới chưa khớp.");
+    await page.setViewportSize({ width: 390, height: 844 });
+    mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/password-settings-mobile.png" });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await panel.getByLabel("Nhập lại mật khẩu mới").fill(nextPassword);
+    await panel.getByRole("button", { name: "Đổi mật khẩu", exact: true }).click();
+    await expect(page).toHaveURL(/\/login/);
+    assert.equal(await db.session.count({ where: { shopId: shop.id } }), 0);
+    await login(password);
+    await expect(page.locator('p[role=alert]')).toContainText("Email hoặc mật khẩu không đúng");
+    await login(nextPassword);
+    await expect(page).toHaveURL(`${base}/`);
+    await adminPage.goto(`${base}/admin/login`);
+    await adminPage.getByLabel("Email", { exact: true }).fill(admin.email);
+    await adminPage.getByLabel("Mật khẩu", { exact: true }).fill(password);
+    await adminPage.getByRole("button", { name: "Đăng nhập quản trị" }).click();
+    await expect(adminPage).toHaveURL(`${base}/admin`);
+    await adminPage.goto(`${base}/admin?q=${encodeURIComponent(shop.email)}`);
+    await adminPage.getByRole("button", { name: "Reset mật khẩu", exact: true }).click();
+    const resetRequest = adminPage.waitForRequest((request) => request.method() === "POST" && !!request.headers()["next-action"]);
+    await adminPage.getByRole("button", { name: "Xác nhận reset" }).click();
+    const captured = await resetRequest;
+    const output = adminPage.getByLabel("Mật khẩu mới của shop");
+    await expect(output).toHaveValue(/^Fh!9.{32}$/);
+    const generated = await output.inputValue();
+    const updated = await db.shop.findUniqueOrThrow({ where: { id: shop.id } });
+    const [salt, key] = updated.passwordHash.split(":");
+    assert.equal(scryptSync(generated, salt, 64).toString("hex"), key);
+    assert.equal(await db.session.count({ where: { shopId: shop.id } }), 0);
+    const events = await db.adminEvent.findMany({ where: { shopId: shop.id } });
+    assert.equal(events.length, 1);
+    assert.equal(events[0].adminId, admin.id);
+    assert.deepEqual(JSON.parse(events[0].details), { type: "password-reset" });
+    // A shop session cannot invoke the admin-only reset action, even with its action ID.
+    const token = randomBytes(32).toString("hex");
+    await db.session.create({ data: { id: createHash("sha256").update(token).digest("hex"), shopId: other.id, expiresAt: new Date(Date.now() + 60000) } });
+    const unauthorized = await browser.newContext();
+    await unauthorized.addCookies([{ name: "floralhelp_session", value: token, url: base }]);
+    await unauthorized.request.post(captured.url(), { headers: { "next-action": captured.headers()["next-action"], "content-type": captured.headers()["content-type"], origin: base }, data: captured.postData(), maxRedirects: 0 });
+    assert.equal((await db.shop.findUniqueOrThrow({ where: { id: shop.id } })).passwordHash, updated.passwordHash);
+    assert.equal((await db.shop.findUniqueOrThrow({ where: { id: other.id } })).passwordHash, other.passwordHash);
+    await unauthorized.close();
+    await adminPage.setViewportSize({ width: 390, height: 844 });
+    await adminPage.screenshot({ path: "artifacts/password-reset-mobile.png" });
+    assert.equal(await adminPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await adminPage.reload();
+    await expect(adminPage.getByLabel("Mật khẩu mới của shop")).toHaveCount(0);
+    await adminPage.getByText("Lịch sử quản trị gần đây").click();
+    await expect(adminPage.getByText("Đã reset mật khẩu shop", { exact: false })).toBeVisible();
+    await page.reload();
+    await expect(page).toHaveURL(/\/login/);
+    await login(nextPassword);
+    await expect(page.locator('p[role=alert]')).toContainText("Email hoặc mật khẩu không đúng");
+    await login(generated);
+    await expect(page).toHaveURL(`${base}/`);
+  } finally {
+    for (const record of [shop, other]) if (record) { await db.authAttempt.deleteMany({ where: { key: { in: [record.email, `change-password:${record.id}`] } } }); await db.shop.deleteMany({ where: { id: record.id } }); }
+    if (admin) { await db.authAttempt.deleteMany({ where: { key: `admin:${admin.email}` } }); await db.admin.deleteMany({ where: { id: admin.id } }); }
+    await browser.close(); await db.$disconnect();
+  }
+});

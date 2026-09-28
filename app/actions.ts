@@ -9,6 +9,7 @@ import {
   deleteSession,
   hashPassword,
   verifyPassword,
+  requireShop,
 } from "@/lib/auth";
 import { orderSchema, orderItemSchema, orderPaymentSchema, productSchema, cashSchema, customerSchema } from "@/lib/validation";
 import { shopData } from "@/lib/shop-data";
@@ -82,6 +83,29 @@ export async function authenticate(_: { error: string }, form: FormData) {
 export async function logout() {
   await deleteSession();
   redirect("/login");
+}
+export async function changeShopPassword(form: FormData) {
+  const shop = await requireShop();
+  const parsed = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(10).max(128), confirmPassword: z.string() }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: "Mật khẩu mới cần từ 10 đến 128 ký tự." };
+  const { currentPassword, newPassword, confirmPassword } = parsed.data;
+  if (newPassword !== confirmPassword) return { error: "Nhập lại mật khẩu mới chưa khớp." };
+  if (newPassword === currentPassword) return { error: "Mật khẩu mới phải khác mật khẩu hiện tại." };
+  const key = `change-password:${shop.id}`;
+  await db.authAttempt.deleteMany({ where: { key, resetsAt: { lte: new Date() } } });
+  const attempt = await db.authAttempt.upsert({ where: { key }, create: { key, resetsAt: new Date(Date.now() + 900000) }, update: { count: { increment: 1 } } });
+  if (attempt.count > 10) return { error: "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau 15 phút." };
+  if (!verifyPassword(currentPassword, shop.passwordHash)) return { error: "Mật khẩu hiện tại không đúng." };
+  const changed = await db.$transaction(async (tx) => {
+    const result = await tx.shop.updateMany({ where: { id: shop.id, passwordHash: shop.passwordHash }, data: { passwordHash: hashPassword(newPassword) } });
+    if (!result.count) return false;
+    await tx.session.deleteMany({ where: { shopId: shop.id } });
+    await tx.authAttempt.deleteMany({ where: { key } });
+    return true;
+  });
+  if (!changed) return { error: "Mật khẩu vừa được thay đổi. Vui lòng đăng nhập lại." };
+  await deleteSession();
+  return { error: "" };
 }
 export async function addCustomer(form: FormData) {
   const data = await shopData();

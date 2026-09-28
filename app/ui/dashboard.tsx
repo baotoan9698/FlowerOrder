@@ -35,6 +35,7 @@ import OrderForm from "./order-form";
 import OrderHistoryLoader from "./order-history-loader";
 import OrderItemSummary from "./order-item-summary";
 import CuteFlower from "./cute-flower";
+import ChangePassword from "./change-password";
 import { Users } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -56,6 +57,7 @@ function Modal({
   headerActions?: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const backdropPress = useRef(false);
   const titleId = useId();
   useEffect(() => {
     ref.current?.showModal();
@@ -70,9 +72,18 @@ function Modal({
       className={className}
       aria-labelledby={titleId}
       ref={ref}
-      onCancel={close}
+      onCancel={(event) => { event.preventDefault(); close(); }}
+      onPointerDown={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        backdropPress.current = event.target === event.currentTarget &&
+          (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom);
+      }}
+      onPointerCancel={() => { backdropPress.current = false; }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) close();
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const outside = e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom;
+        if (backdropPress.current && e.target === e.currentTarget && outside) close();
+        backdropPress.current = false;
       }}
     >
       <div className="modal-head">
@@ -148,6 +159,10 @@ export default function Dashboard({
   }
   const [deleting, setDeleting] = useState<OrderView | null>(null);
   const [settings, setSettings] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
+  const [selection, setSelection] = useState<{ key: string; ids: string[] }>({ key: "", ids: [] });
+  const settingsFormId = useId();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, start] = useTransition();
@@ -169,6 +184,22 @@ export default function Dashboard({
     filtered.sort((a, b) =>
       b.orderDate.localeCompare(a.orderDate) || b.orderTime.localeCompare(a.orderTime),
     );
+  }
+  const paginationKey = JSON.stringify([prefix, day, receivablesOnly, filter, query, pageSize]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = pagination.key === paginationKey ? Math.min(pagination.page, pageCount) : 1;
+  if (pagination.key !== paginationKey || pagination.page !== currentPage) {
+    setPagination({ key: paginationKey, page: currentPage });
+  }
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleOrders = filtered.slice(pageStart, pageStart + pageSize);
+  const selectionKey = JSON.stringify([view, filter, query]);
+  if (selection.key !== selectionKey) setSelection({ key: selectionKey, ids: [] });
+  const selectedIds = new Set(selection.key === selectionKey ? selection.ids.filter((id) => filtered.some((order) => order.id === id)) : []);
+  function selectOrders(ids: string[], checked: boolean) {
+    const next = new Set(selectedIds);
+    ids.forEach((id) => checked ? next.add(id) : next.delete(id));
+    setSelection({ key: selectionKey, ids: [...next] });
   }
   const offset =
     (new Date(month.getFullYear(), month.getMonth(), 1).getDay() + 6) % 7;
@@ -572,10 +603,11 @@ export default function Dashboard({
                     </button>
                   </div>
                 ) : view === "orders" ? (
-                  <OrdersTable orders={filtered} onEdit={(order) => { setError(""); setEditing(order); }} onDelete={(order) => { setError(""); setDeleting(order); }} />
+                  <><div className="order-selection-toolbar"><span role="status">Đã chọn {selectedIds.size} đơn{selectedIds.size > 0 ? " (qua các trang)" : ""}</span>{selectedIds.size > 0 && <button type="button" className="text-button" onClick={() => setSelection({ key: selectionKey, ids: [] })}>Bỏ chọn tất cả</button>}</div>
+                  <OrdersTable orders={visibleOrders} selectedIds={selectedIds} onSelect={selectOrders} onEdit={(order) => { setError(""); setEditing(order); }} onDelete={(order) => { setError(""); setDeleting(order); }} /></>
                 ) : (
                   <div className="order-list">
-                    {filtered.map((o) => (
+                    {visibleOrders.map((o) => (
                       <article className="order-card clickable-order" key={o.id} onClick={(event) => {
                         if (!(event.target as HTMLElement).closest("a, button, input, select") && !window.getSelection()?.toString()) router.push(`/orders/${o.id}`);
                       }}>
@@ -663,6 +695,15 @@ export default function Dashboard({
                     ))}
                   </div>
                 )}
+                {filtered.length > 0 && <nav className="overview-pagination" aria-label={view === "orders" ? "Phân trang danh sách đơn hàng" : "Phân trang đơn hàng tổng quan"}>
+                  <label>Hiển thị<select aria-label="Số đơn mỗi trang" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>{[10, 20, 50].map((size) => <option key={size} value={size}>{size} đơn</option>)}</select></label>
+                  <span role="status">{pageStart + 1}–{Math.min(pageStart + pageSize, filtered.length)} / {filtered.length} đơn</span>
+                  <div className="overview-page-buttons">
+                    <button type="button" className="secondary" disabled={currentPage === 1} onClick={() => setPagination({ key: paginationKey, page: currentPage - 1 })}><ChevronLeft size={16} /> Trước</button>
+                    <span>Trang {currentPage}/{pageCount}</span>
+                    <button type="button" className="secondary" disabled={currentPage === pageCount} onClick={() => setPagination({ key: paginationKey, page: currentPage + 1 })}>Sau <ChevronRight size={16} /></button>
+                  </div>
+                </nav>}
               </section>
             </>
           )}
@@ -732,6 +773,7 @@ export default function Dashboard({
           close={() => !pending && setSettings(false)}
         >
           <form
+            id={settingsFormId}
             onSubmit={(event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
@@ -766,12 +808,13 @@ export default function Dashboard({
                 {error}
               </p>
             )}
-            <div className="modal-actions">
-              <button className="primary" disabled={pending}>
+          </form>
+            <div className="modal-actions shop-settings-actions">
+              <ChangePassword />
+              <button className="primary" form={settingsFormId} type="submit" disabled={pending}>
                 {pending ? "Đang lưu…" : "Lưu thay đổi"}
               </button>
             </div>
-          </form>
         </Modal>
       )}
     </div>

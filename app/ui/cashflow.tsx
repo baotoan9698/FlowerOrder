@@ -11,6 +11,7 @@ export default function Cashflow({ entries, orders }: { entries: CashView[]; ord
   const today = vietnamToday();
   const [from, setFrom] = useState(today.slice(0, 7) + "-01");
   const [to, setTo] = useState(today);
+  const [datePreset, setDatePreset] = useState("month");
   const [type, setType] = useState("all");
   const [editing, setEditing] = useState<CashView | "new" | null>(null);
   const [amount, setAmount] = useState("");
@@ -37,8 +38,8 @@ export default function Cashflow({ entries, orders }: { entries: CashView[]; ord
     <div className="page-heading"><div><span className="eyebrow">SỔ THU CHI CỦA SHOP</span><h1>Thu chi</h1><p>Theo dõi các khoản thu và chi theo ngày giao dịch.</p></div><button className="primary" onClick={() => open("new")}><Plus size={18} /> Thêm thu chi</button></div>
     <p className="cash-hint">Tổng thu là doanh thu từ đơn hàng theo ngày đặt, gồm cả tiền chưa thanh toán. Tổng chi lấy từ phiếu chi theo ngày giao dịch. Phiếu thu ghi tay vẫn lưu trong sổ và không cộng thêm vào doanh thu.</p>
     <section className="card report-filters">
-      <div className="filters"><button onClick={() => { setFrom(today); setTo(today); }}>Hôm nay</button><button onClick={() => { setFrom(today.slice(0, 7) + "-01"); setTo(today); }}>Tháng này</button><button onClick={() => { setFrom(allDates.reduce((first, date) => date < first ? date : first, today)); setTo(allDates.reduce((last, date) => date > last ? date : last, today)); }}>Tất cả thời gian</button></div>
-      <div className="cash-date-range"><label>Từ ngày<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label>Đến ngày<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label></div>
+      <div className="filters"><button className={datePreset === "today" ? "active" : ""} aria-pressed={datePreset === "today"} onClick={() => { setDatePreset("today"); setFrom(today); setTo(today); }}>Hôm nay</button><button className={datePreset === "month" ? "active" : ""} aria-pressed={datePreset === "month"} onClick={() => { setDatePreset("month"); setFrom(today.slice(0, 7) + "-01"); setTo(today); }}>Tháng này</button><button className={datePreset === "all" ? "active" : ""} aria-pressed={datePreset === "all"} onClick={() => { setDatePreset("all"); setFrom(allDates.reduce((first, date) => date < first ? date : first, today)); setTo(allDates.reduce((last, date) => date > last ? date : last, today)); }}>Tất cả thời gian</button></div>
+      <div className="cash-date-range"><label>Từ ngày<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setDatePreset("custom"); }} /></label><label>Đến ngày<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setDatePreset("custom"); }} /></label></div>
       {invalid && <p className="error" role="alert">Chọn khoảng ngày hợp lệ: từ ngày không sau đến ngày.</p>}
     </section>
     <div className="stats cash-stats">{[["Tổng thu", income, "Doanh thu theo ngày đặt đơn"], ["Tổng chi", expense, "Phiếu chi theo ngày giao dịch"], ["Chênh lệch thu − chi", income - expense, "Doanh thu − Tổng chi trong kỳ"]].map(([label, value, description]) => <article className="stat" key={label}><span>{label}</span><strong>{money(Number(value))}</strong><small>{description}</small></article>)}</div>

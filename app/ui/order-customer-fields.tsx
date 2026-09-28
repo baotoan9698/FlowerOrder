@@ -88,7 +88,7 @@ export default function OrderCustomerFields({ order, customers: initialCustomers
     <input aria-label="Số điện thoại" placeholder="SĐT" name="phone" type="tel" required maxLength={20} value={phone} readOnly={!!selected} onChange={(e) => setPhone(e.target.value)} />
     {!selected && phoneQuery ? <input className="span-two" aria-label="Tên khách hàng mới" placeholder="Tên khách hàng mới" name="customer" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /> : <input type="hidden" name="customer" value={name} />}
     <input aria-label="Email khách hàng" placeholder="Email (không bắt buộc)" name="customerEmail" type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
-    <div className="compact-birthday"><input aria-label="Ngày sinh" name="customerBirthday" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} data-empty={!birthday} />{!birthday && <span>Ngày sinh</span>}</div>
+    <div className="compact-birthday"><input aria-label="Ngày sinh" name="customerBirthday" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} data-empty={!birthday} />{!birthday && <span aria-hidden="true">ngày/tháng/năm sinh</span>}</div>
     <input className="span-two" aria-label="Địa chỉ" placeholder="Địa chỉ" name="address" maxLength={300} value={address} onChange={(e) => setAddress(e.target.value)} />
     <div className="span-two customer-save">
       <button type="button" className="secondary" disabled={saving} onClick={() => {
